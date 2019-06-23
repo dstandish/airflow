@@ -92,6 +92,9 @@ def convert_to_utc(value):
     if not is_localized(value):
         value = pendulum.instance(value, TIMEZONE)
 
+    if hasattr(value, 'fold'):
+        value = value.replace(fold=1)
+
     return value.astimezone(utc)
 
 
