@@ -63,6 +63,7 @@ class TestSSHHook(unittest.TestCase):
         with create_session() as session:
             conns_to_reset = [
                 cls.CONN_SSH_WITH_PRIVATE_KEY_EXTRA,
+                cls.CONN_SSH_WITH_EXTRA,
             ]
             connections = session.query(Connection).filter(Connection.conn_id.in_(conns_to_reset))
             connections.delete(synchronize_session=False)
