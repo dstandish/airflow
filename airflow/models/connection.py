@@ -126,6 +126,16 @@ class Connection(Base, LoggingMixin):
             self.port = port
             self.extra = extra
 
+    def __eq__(self, other):
+        return self.conn_id == other.conn_id \
+            and self.conn_type == other.conn_type \
+            and self.host == other.host \
+            and self.login == other.login \
+            and self.password == other.password \
+            and self.schema == other.schema \
+            and self.port == other.port \
+            and self.extra == other.extra
+
     def parse_from_uri(self, uri):
         uri_parts = urlparse(uri)
         conn_type = uri_parts.scheme
