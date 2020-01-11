@@ -19,16 +19,15 @@
 
 
 import os
-from typing import Dict, Optional
+import signal
+from subprocess import PIPE, STDOUT, Popen
+from tempfile import TemporaryDirectory, gettempdir
 
 from airflow.exceptions import AirflowException
-from airflow.hooks.bash_hook import BashHook
-from airflow.models import BaseOperator
-from airflow.utils.decorators import apply_defaults
-from airflow.utils.operator_helpers import context_to_airflow_vars
+from airflow.hooks.base_hook import BaseHook
 
 
-class BashOperator(BaseOperator):
+class BashHook(BaseHook):
     """
     Execute a Bash script, command or set of commands.
 
@@ -62,53 +61,64 @@ class BashOperator(BaseOperator):
         bash_command = "set -e; python3 script.py '{{ next_execution_date }}'"
     """
 
-    template_fields = ('bash_command', 'env')
-    template_ext = (
-        '.sh',
-        '.bash',
-    )
-    ui_color = '#f0ede4'
-
-    @apply_defaults
-    def __init__(
-        self,
-        bash_command: str,
-        env: Optional[Dict[str, str]] = None,
-        output_encoding: str = 'utf-8',
-        *args,
-        **kwargs
-    ) -> None:
-
+    def __init__(self, *args, output_encoding='utf-8', **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.bash_command = bash_command
+        self.sub_process = None
         self.output_encoding = output_encoding
-        if kwargs.get('xcom_push') is not None:
-            raise AirflowException(
-                "'xcom_push' was deprecated, use 'BaseOperator.do_xcom_push' instead"
+
+    def get_conn(self):
+        raise NotImplementedError
+
+    def run_command(self, bash_command, env=None):
+        """
+        Execute the bash command in a temporary directory
+        which will be cleaned afterwards
+        """
+        self.log.info('Tmp dir root location: \n %s', gettempdir())
+
+        env = env or os.environ.copy()
+
+        with TemporaryDirectory(prefix='airflowtmp') as tmp_dir:
+
+            def pre_exec():
+                # Restore default signal disposition and invoke setsid
+                for sig in ('SIGPIPE', 'SIGXFZ', 'SIGXFSZ'):
+                    if hasattr(signal, sig):
+                        signal.signal(getattr(signal, sig), signal.SIG_DFL)
+                os.setsid()
+
+            self.log.info('Running command: %s', bash_command)
+
+            self.sub_process = Popen(  # pylint: disable=subprocess-popen-preexec-fn
+                ['bash', "-c", bash_command],
+                stdout=PIPE,
+                stderr=STDOUT,
+                cwd=tmp_dir,
+                env=env,
+                preexec_fn=pre_exec,
             )
-        self.bash_hook = None
-        self.env = env
-        self.lineage_data = bash_command
 
-    def get_env(self, context):
-        env = self.env or os.environ.copy()
+            self.log.info('Output:')
+            line = ''
+            for raw_line in iter(self.sub_process.stdout.readline, b''):
+                line = raw_line.decode(self.output_encoding).rstrip()
+                self.log.info("%s", line)
 
-        airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)
-        self.log.info(
-            'Exporting the following env vars:\n%s',
-            '\n'.join(["{}={}".format(k, v) for k, v in airflow_context_vars.items()]),
-        )
-        env.update(airflow_context_vars)
-        return env
+            self.sub_process.wait()
 
-    def execute(self, context):
-        self.bash_hook = BashHook(output_encoding=self.output_encoding)
+            self.log.info('Command exited with return code %s', self.sub_process.returncode)
 
-        line = self.bash_hook.run_command(
-            bash_command=self.bash_command, env=self.get_env(context),
-        )
+            if self.sub_process.returncode != 0:
+                raise AirflowException(
+                    'Bash command failed. The command returned a non-zero exit code.'
+                )
+
         return line
 
-    def on_kill(self):
-        if hasattr(self.bash_hook, 'send_sigterm'):
-            self.bash_hook.send_sigterm()
+    def send_sigterm(self):
+        """
+        Sends sigterm to subprocess if subprocess exists.
+        """
+        self.log.info('Sending SIGTERM signal to bash process group')
+        if self.sub_process and hasattr(self.sub_process, 'pid'):
+            os.killpg(os.getpgid(self.sub_process.pid), signal.SIGTERM)

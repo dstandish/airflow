@@ -26,8 +26,10 @@ from tempfile import NamedTemporaryFile
 import mock
 
 from airflow import DAG, AirflowException
+from airflow.models import DagRun
 from airflow.operators.bash_operator import BashOperator
 from airflow.utils import timezone
+from airflow.utils.session import create_session
 from airflow.utils.state import State
 
 DEFAULT_DATE = datetime(2016, 1, 1, tzinfo=timezone.utc)
@@ -36,6 +38,9 @@ INTERVAL = timedelta(hours=12)
 
 
 class TestBashOperator(unittest.TestCase):
+    def tearDown(self) -> None:
+        with create_session() as session:
+            session.query(DagRun).delete()
 
     def test_echo_env_variables(self):
         """
@@ -133,10 +138,10 @@ class TestBashOperator(unittest.TestCase):
         self.assertEqual(bash_operator.retries, 0)
 
     @mock.patch.dict('os.environ', clear=True)
-    @mock.patch("airflow.operators.bash_operator.TemporaryDirectory", **{  # type: ignore
+    @mock.patch("airflow.hooks.bash_hook.TemporaryDirectory", **{  # type: ignore
         'return_value.__enter__.return_value': '/tmp/airflowtmpcatcat'
     })
-    @mock.patch("airflow.operators.bash_operator.Popen", **{  # type: ignore
+    @mock.patch("airflow.hooks.bash_hook.Popen", **{  # type: ignore
         'return_value.stdout.readline.side_effect': [b'BAR', b'BAZ'],
         'return_value.returncode': 0
     })

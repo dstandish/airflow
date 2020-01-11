@@ -1043,7 +1043,7 @@ These integrations allow you to perform various operations using various softwar
 
    * - `GNU Bash <https://www.gnu.org/software/bash/>`__
      - :doc:`How to use <howto/operator/bash>`
-     -
+     - :mod:`airflow.hooks.bash_hook`
      - :mod:`airflow.operators.bash_operator`
      - :mod:`airflow.contrib.sensors.bash_sensor`
 
