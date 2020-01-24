@@ -21,7 +21,7 @@ import json
 from typing import Any
 
 from cryptography.fernet import InvalidToken as InvalidFernetToken
-from sqlalchemy import Boolean, Column, Integer, String, Text
+from sqlalchemy import Boolean, Column, Integer, String, Text, UniqueConstraint, and_
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import synonym
 
@@ -36,9 +36,12 @@ class Variable(Base, LoggingMixin):
     __NO_DEFAULT_SENTINEL = object()
 
     id = Column(Integer, primary_key=True)
-    key = Column(String(ID_LEN), unique=True)
+    key = Column(String(ID_LEN))
+    namespace = Column(String(ID_LEN), default='default')
     _val = Column('val', Text)
     is_encrypted = Column(Boolean, unique=False, default=False)
+
+    __table_args__ = (UniqueConstraint('namespace', 'key'),)
 
     def __repr__(self):
         # Hiding the value
@@ -51,10 +54,20 @@ class Variable(Base, LoggingMixin):
                 fernet = get_fernet()
                 return fernet.decrypt(bytes(self._val, 'utf-8')).decode()
             except InvalidFernetToken:
-                log.error("Can't decrypt _val for key=%s, invalid token or value", self.key)
+                log.error(
+                    "Can't decrypt _val for namespace={}, key={}; invalid token or value".format(
+                        self.key,
+                        self.namespace
+                    )
+                )
                 return None
             except Exception:
-                log.error("Can't decrypt _val for key=%s, FERNET_KEY configuration missing", self.key)
+                log.error(
+                    "Can't decrypt _val for namespace={}, key={}; FERNET_KEY configuration missing".format(
+                        self.key,
+                        self.namespace
+                    )
+                )
                 return None
         else:
             return self._val
@@ -67,8 +80,7 @@ class Variable(Base, LoggingMixin):
 
     @declared_attr
     def val(cls):
-        return synonym('_val',
-                       descriptor=property(cls.get_val, cls.set_val))
+        return synonym('_val', descriptor=property(cls.get_val, cls.set_val))
 
     @classmethod
     def setdefault(cls, key, default, deserialize_json=False):
@@ -85,8 +97,7 @@ class Variable(Base, LoggingMixin):
             and un-encode it when retrieving a value
         :return: Mixed
         """
-        obj = Variable.get(key, default_var=None,
-                           deserialize_json=deserialize_json)
+        obj = Variable.get(key, default_var=None, deserialize_json=deserialize_json)
         if obj is None:
             if default is not None:
                 Variable.set(key, default, serialize_json=deserialize_json)
@@ -101,11 +112,12 @@ class Variable(Base, LoggingMixin):
     def get(
         cls,
         key: str,
+        namespace: str = 'default',
         default_var: Any = __NO_DEFAULT_SENTINEL,
         deserialize_json: bool = False,
-        session=None
+        session=None,
     ):
-        obj = session.query(cls).filter(cls.key == key).first()
+        obj = session.query(cls).filter(and_(cls.key == key, cls.namespace == namespace)).first()
         if obj is None:
             if default_var is not cls.__NO_DEFAULT_SENTINEL:
                 return default_var
@@ -119,13 +131,7 @@ class Variable(Base, LoggingMixin):
 
     @classmethod
     @provide_session
-    def set(
-        cls,
-        key: str,
-        value: Any,
-        serialize_json: bool = False,
-        session=None
-    ):
+    def set(cls, key: str, value: Any, namespace='default', serialize_json: bool = False, session=None):
 
         if serialize_json:
             stored_value = json.dumps(value, indent=2)
@@ -133,7 +139,7 @@ class Variable(Base, LoggingMixin):
             stored_value = str(value)
 
         Variable.delete(key, session=session)
-        session.add(Variable(key=key, val=stored_value))  # type: ignore
+        session.add(Variable(key=key, val=stored_value, namespace=namespace))  # type: ignore
         session.flush()
 
     @classmethod

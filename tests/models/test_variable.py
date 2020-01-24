@@ -20,6 +20,7 @@
 import unittest
 
 from cryptography.fernet import Fernet
+from sqlalchemy import and_
 
 from airflow import settings
 from airflow.models import Variable, crypto
@@ -92,8 +93,9 @@ class TestVariable(unittest.TestCase):
 
     def test_get_non_existing_var_should_return_default(self):
         default_value = "some default val"
-        self.assertEqual(default_value, Variable.get("thisIdDoesNotExist",
-                                                     default_var=default_value))
+        self.assertEqual(
+            default_value, Variable.get("thisIdDoesNotExist", default_var=default_value)
+        )
 
     def test_get_non_existing_var_should_raise_key_error(self):
         with self.assertRaises(KeyError):
@@ -104,9 +106,10 @@ class TestVariable(unittest.TestCase):
 
     def test_get_non_existing_var_should_not_deserialize_json_default(self):
         default_value = "}{ this is a non JSON default }{"
-        self.assertEqual(default_value, Variable.get("thisIdDoesNotExist",
-                                                     default_var=default_value,
-                                                     deserialize_json=True))
+        self.assertEqual(
+            default_value,
+            Variable.get("thisIdDoesNotExist", default_var=default_value, deserialize_json=True),
+        )
 
     def test_variable_setdefault_round_trip(self):
         key = "tested_var_setdefault_1_id"
@@ -146,3 +149,15 @@ class TestVariable(unittest.TestCase):
         Variable.delete(key)
         with self.assertRaises(KeyError):
             Variable.get(key)
+
+    def test_variable_with_namespace(self):
+        """
+        Test variables with namespace
+        """
+        v = Variable()
+        v.set(value='yo face', key='test', namespace='yo other face')
+        session = settings.Session()
+        test_var = session.query(Variable).filter(
+            and_(Variable.key == 'test', Variable.namespace == 'yo other face')).one()
+        self.assertTrue(test_var.is_encrypted)
+        self.assertEqual(test_var.val, 'yo face')

@@ -1263,9 +1263,10 @@ class TaskInstance(Base, LoggingMixin):
             @staticmethod
             def get(
                 item: str,
+                namespace: str = 'default',
                 default_var: Any = Variable._Variable__NO_DEFAULT_SENTINEL,
             ):
-                return Variable.get(item, default_var=default_var)
+                return Variable.get(key=item, namespace=namespace, default_var=default_var)
 
         class VariableJsonAccessor:
             """
@@ -1289,9 +1290,15 @@ class TaskInstance(Base, LoggingMixin):
             @staticmethod
             def get(
                 item: str,
+                namespace: str = 'default',
                 default_var: Any = Variable._Variable__NO_DEFAULT_SENTINEL,
             ):
-                return Variable.get(item, default_var=default_var, deserialize_json=True)
+                return Variable.get(
+                    key=item,
+                    namespace=namespace,
+                    default_var=default_var,
+                    deserialize_json=True,
+                )
 
         return {
             'conf': conf,

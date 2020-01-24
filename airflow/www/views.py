@@ -2296,10 +2296,10 @@ class VariableModelView(AirflowModelView):
 
     base_permissions = ['can_add', 'can_list', 'can_edit', 'can_delete', 'can_varimport']
 
-    list_columns = ['key', 'val', 'is_encrypted']
-    add_columns = ['key', 'val']
-    edit_columns = ['key', 'val']
-    search_columns = ['key', 'val']
+    list_columns = ['namespace', 'key', 'val', 'is_encrypted']
+    add_columns = ['namespace', 'key', 'val']
+    edit_columns = ['namespace', 'key', 'val']
+    search_columns = ['namespace', 'key', 'val']
 
     base_order = ('key', 'asc')
 
@@ -2355,18 +2355,19 @@ class VariableModelView(AirflowModelView):
         try:
             out = request.files['file'].read()
             if isinstance(out, bytes):
-                d = json.loads(out.decode('utf-8'))
+                variable_file_lines = out.decode('utf-8').splitlines()
             else:
-                d = json.loads(out)
+                variable_file_lines = out.splitlines()
         except Exception:
             self.update_redirect()
-            flash("Missing file or syntax error.", 'error')
+            flash("Missing file or syntax error. ndjson is expected.", 'error')
             return redirect(self.get_redirect())
         else:
             suc_count = fail_count = 0
-            for k, v in d.items():
+            for line in variable_file_lines:
                 try:
-                    models.Variable.set(k, v, serialize_json=not isinstance(v, str))
+                    var_dict = json.loads(line)
+                    models.Variable.set(**var_dict)
                 except Exception as e:
                     logging.info('Variable import failed: {}'.format(repr(e)))
                     fail_count += 1
