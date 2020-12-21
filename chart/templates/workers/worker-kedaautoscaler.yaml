@@ -35,6 +35,7 @@ metadata:
 {{- end }}
 spec:
   scaleTargetRef:
+    kind: {{ ternary "StatefulSet" "Deployment" .Values.workers.persistence.enabled }}
     name: {{ .Release.Name }}-worker
   pollingInterval:  {{  .Values.workers.keda.pollingInterval }}   # Optional. Default: 30 seconds
   cooldownPeriod: {{  .Values.workers.keda.cooldownPeriod }}    # Optional. Default: 300 seconds

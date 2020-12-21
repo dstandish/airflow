@@ -342,7 +342,6 @@ helm install keda kedacore/keda \
 ### Enable KEDA for airflow
 
 Enable for the airflow instance by setting `workers.keda.enabled=true` your helm command or in the `values.yaml`.
-(Note: KEDA does not support StatefulSets so you need to set `worker.persistence.enabled` to `false`)
 
 ```bash
 kubectl create namespace airflow
@@ -351,7 +350,6 @@ helm install airflow . \
     --namespace airflow \
     --set executor=CeleryExecutor \
     --set workers.keda.enabled=true \
-    --set workers.persistence.enabled=false
 ```
 
 This will create an `ScaledObject` and an `hpa` in the airflow namespace.
