@@ -320,22 +320,28 @@ helm install --name my-release \
 
 KEDA stands for Kubernetes Event Driven Autoscaling. [KEDA](https://github.com/kedacore/keda) is a custom controller that allows users to create custom bindings
 to the Kubernetes [Horizontal Pod Autoscaler](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/).
-We've built an experimental scaler that allows users to create scalers based on postgreSQL queries. For the moment this exists
-on a separate branch, but will be merged upstream soon. To install our custom version of KEDA on your cluster, please run
+
+KEDA may be used with the `CeleryExecutor` and `CeleryKubernetesExecutor` executors.
+
+### Install KEDA
+
+First install into the cluster under namespace `keda`.
 
 ```bash
 helm repo add kedacore https://kedacore.github.io/charts
 
 helm repo update
 
-helm install \
-    --set image.keda=docker.io/kedacore/keda:1.2.0 \
-    --set image.metricsAdapter=docker.io/kedacore/keda-metrics-adapter:1.2.0 \
-    --namespace keda --name keda kedacore/keda
+kubectl create namespace keda
+
+helm install keda kedacore/keda \
+    --namespace keda \
+    --version "v2.0.0"
 ```
 
-Once KEDA is installed (which should be pretty quick since there is only one pod). You can try out KEDA autoscaling
-on this chart by setting `workers.keda.enabled=true` your helm command or in the `values.yaml`.
+### Enable KEDA for airflow
+
+Enable for the airflow instance by setting `workers.keda.enabled=true` your helm command or in the `values.yaml`.
 (Note: KEDA does not support StatefulSets so you need to set `worker.persistence.enabled` to `false`)
 
 ```bash
@@ -347,6 +353,10 @@ helm install airflow . \
     --set workers.keda.enabled=true \
     --set workers.persistence.enabled=false
 ```
+
+This will create an `ScaledObject` and an `hpa` in the airflow namespace.
+
+See the template file in `templates/workers/worker-kedaautoscaler.yaml` for more details.
 
 ## Using an external redis instance
 
