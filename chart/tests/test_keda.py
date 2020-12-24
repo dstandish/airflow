@@ -55,3 +55,24 @@ class KedaTest(unittest.TestCase):
             self.assertEqual("RELEASE-NAME-worker", jmespath.search("metadata.name", docs[0]))
         else:
             self.assertListEqual(docs, [])
+
+    @parameterized.expand(
+        [
+            ('enabled', 'StatefulSet'),
+            ('not_enabled', 'Deployment'),
+        ]
+    )
+    def test_persistence(self, enabled, kind):
+        """
+        If worker persistence is enabled, scaleTargetRef should be StatefulSet else Deployment.
+        """
+        is_enabled = enabled == 'enabled'
+        docs = render_chart(
+            values={
+                "workers": {"keda": {"enabled": True}, "persistence": {"enabled": is_enabled}},
+                'executor': 'CeleryExecutor',
+            },
+            show_only=["templates/workers/worker-kedaautoscaler.yaml"],
+            validate_schema=False,
+        )
+        self.assertEqual(kind, jmespath.search("spec.scaleTargetRef.kind", docs[0]))
