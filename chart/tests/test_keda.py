@@ -14,23 +14,20 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import unittest
-
 import jmespath
 from parameterized import parameterized
 
 from tests.helm_template_generator import render_chart
 
 
-class KedaTest(unittest.TestCase):
+class TestKeda:
     def test_keda_disabled_by_default(self):
         """disabled by default"""
         docs = render_chart(
             values={},
             show_only=["templates/workers/worker-kedaautoscaler.yaml"],
-            validate_schema=False,
         )
-        self.assertListEqual(docs, [])
+        assert docs == []
 
     @parameterized.expand(
         [
@@ -49,12 +46,11 @@ class KedaTest(unittest.TestCase):
                 'executor': executor,
             },
             show_only=["templates/workers/worker-kedaautoscaler.yaml"],
-            validate_schema=False,
         )
         if is_created:
-            self.assertEqual("RELEASE-NAME-worker", jmespath.search("metadata.name", docs[0]))
+            assert jmespath.search("metadata.name", docs[0]) == "RELEASE-NAME-worker"
         else:
-            self.assertListEqual(docs, [])
+            assert docs == []
 
     @parameterized.expand(
         [
@@ -73,6 +69,5 @@ class KedaTest(unittest.TestCase):
                 'executor': 'CeleryExecutor',
             },
             show_only=["templates/workers/worker-kedaautoscaler.yaml"],
-            validate_schema=False,
         )
-        self.assertEqual(kind, jmespath.search("spec.scaleTargetRef.kind", docs[0]))
+        assert jmespath.search("spec.scaleTargetRef.kind", docs[0]) == kind
