@@ -23,7 +23,6 @@ from typing import Dict, Optional
 
 from airflow import AirflowException
 from airflow.hooks.base import BaseHook
-from airflow.utils.operator_helpers import context_to_airflow_vars
 
 
 class BashHook(BaseHook):
@@ -33,25 +32,12 @@ class BashHook(BaseHook):
         self.sub_process = None
         super().__init__()
 
-    def run_command(
-        self, command, context=None, env: Optional[Dict[str, str]] = None, output_encoding: str = 'utf-8'
-    ):
+    def run_command(self, command, env: Optional[Dict[str, str]] = None, output_encoding: str = 'utf-8'):
         """
         Execute the bash command in a temporary directory
         which will be cleaned afterwards
         """
         self.log.info('Tmp dir root location: \n %s', gettempdir())
-
-        env = env.copy()
-        if env is None:
-            env = os.environ.copy()
-
-        airflow_context_vars = context_to_airflow_vars(context, in_env_var_format=True)
-        self.log.debug(
-            'Exporting the following env vars:\n%s',
-            '\n'.join([f"{k}={v}" for k, v in airflow_context_vars.items()]),
-        )
-        env.update(airflow_context_vars)
 
         with TemporaryDirectory(prefix='airflowtmp') as tmp_dir:
 
