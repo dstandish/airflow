@@ -311,7 +311,6 @@ Reinitialising
 Riccomini
 Roadmap
 Robinhood
-sigterm
 SIGTERM
 SSHClient
 SSHTunnelForwarder
