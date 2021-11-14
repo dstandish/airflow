@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from sqlalchemy import Column, Integer, String, func
 
@@ -183,10 +183,10 @@ class Trigger(Base):
 
         # Find triggers who do NOT have an alive triggerer_id, and then assign
         # up to `capacity` of those to us.
-        trigger_ids_query = (
+        unassigned_trigger_ids = (
             session.query(cls.id).filter(cls.triggerer_id.notin_(alive_triggerer_ids)).limit(capacity).all()
         )
-        session.query(cls).filter(cls.id.in_([i.id for i in trigger_ids_query])).update(
+        session.query(cls).filter(cls.id.in_([i.id for i in unassigned_trigger_ids])).update(
             {cls.triggerer_id: triggerer_id},
             synchronize_session=False,
         )
