@@ -18,6 +18,7 @@ import datetime
 from typing import Any, Dict, Iterable, Optional
 
 from sqlalchemy import Column, Integer, String, func
+from sqlalchemy.orm import load_only
 
 from airflow.models.base import Base
 from airflow.models.taskinstance import TaskInstance
@@ -110,7 +111,7 @@ class Trigger(Base):
         Takes an event from an instance of itself, and triggers all dependent
         tasks to resume.
         """
-        for task_instance in session.query(TaskInstance).filter(
+        for task_instance in session.query(TaskInstance).options(load_only(TaskInstance.next_kwargs)).filter(
             TaskInstance.trigger_id == trigger_id, TaskInstance.state == State.DEFERRED
         ):
             # Add the event's payload into the kwargs for the task
@@ -180,14 +181,16 @@ class Trigger(Base):
                 BaseJob.job_type == "TriggererJob",
             )
         ]
-
+        print(f"{alive_triggerer_ids=}")
         # Find triggers who do NOT have an alive triggerer_id, and then assign
         # up to `capacity` of those to us.
         trigger_ids_query = (
             session.query(cls.id).filter(cls.triggerer_id.notin_(alive_triggerer_ids)).limit(capacity).all()
         )
+        print(f"assigning triggers {alive_triggerer_ids} to triggerer {triggerer_id}")
         session.query(cls).filter(cls.id.in_([i.id for i in trigger_ids_query])).update(
             {cls.triggerer_id: triggerer_id},
             synchronize_session=False,
         )
         session.commit()
+

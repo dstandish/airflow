@@ -123,8 +123,9 @@ class TriggererJob(BaseJob):
         This runs synchronously and handles all database reads/writes.
         """
         while not self.runner.stop:
+            print("main loop")
             # Clean out unused triggers
-            Trigger.clean_unused()
+            self.purge_unused_triggers()
             # Load/delete triggers
             self.load_triggers()
             # Handle events
@@ -138,6 +139,9 @@ class TriggererJob(BaseJob):
             # Idle sleep
             time.sleep(1)
 
+    def purge_unused_triggers(self):
+        Trigger.clean_unused()
+
     def load_triggers(self):
         """
         Queries the database to get the triggers we're supposed to be running,
@@ -145,7 +149,9 @@ class TriggererJob(BaseJob):
         need.
         """
         Trigger.assign_unassigned(self.id, self.capacity)
+        print(f'getting triggers for id {self.id=}')
         ids = Trigger.ids_for_triggerer(self.id)
+        print(f"loading triggers {ids!r}")
         self.runner.update_triggers(set(ids))
 
     def handle_events(self):
@@ -240,6 +246,7 @@ class TriggerRunner(threading.Thread, LoggingMixin):
         last_status = time.time()
         while not self.stop:
             # Run core logic
+            print("arun loop")
             await self.create_triggers()
             await self.delete_triggers()
             await self.cleanup_finished_triggers()
@@ -257,9 +264,12 @@ class TriggerRunner(threading.Thread, LoggingMixin):
         Drain the to_create queue and create all triggers that have been
         requested in the DB that we don't yet have.
         """
+        if not self.to_create:
+            print('nothing to do')
         while self.to_create:
             trigger_id, trigger_instance = self.to_create.popleft()
             if trigger_id not in self.triggers:
+                print(f'creating trigger {trigger_id}')
                 self.triggers[trigger_id] = {
                     "task": create_task(self.run_trigger(trigger_id, trigger_instance)),
                     "name": f"{trigger_instance!r} (ID {trigger_id})",

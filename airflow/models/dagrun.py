@@ -99,11 +99,11 @@ class DagRun(Base, LoggingMixin):
     # Foreign key to LogTemplate. DagRun rows created prior to this column's
     # existence have this set to NULL. Later rows automatically populate this on
     # insert to point to the latest LogTemplate entry.
-    log_template_id = Column(
-        Integer,
-        ForeignKey("log_template.id", name="task_instance_log_template_id_fkey", ondelete="NO ACTION"),
-        default=select([func.max(LogTemplate.__table__.c.id)]),
-    )
+    # log_template_id = Column(
+    #     Integer,
+    #     ForeignKey("log_template.id", name="task_instance_log_template_id_fkey", ondelete="NO ACTION"),
+    #     default=select([func.max(LogTemplate.__table__.c.id)]),
+    # )
 
     # Remove this `if` after upgrading Sphinx-AutoAPI
     if not TYPE_CHECKING and "BUILDING_AIRFLOW_DOCS" in os.environ:
